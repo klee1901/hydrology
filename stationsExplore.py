@@ -28,104 +28,90 @@ def getStationsInfo(JSONresponse):
 
     return pd.DataFrame(allStationInfo)
 
+def queryStationData(param):
+
+    query1 = {"status.label":"Active", "observedProperty": param, "_limit": 5000}
+
+    response = requests.get(baseURL+stationsURL, params=query1)
+    if response.status_code == 200:
+        stationsData = getStationsInfo(response)
+    else:
+        raise Exception("API error {0}".format(response.status_code))
+
+    return stationsData
+
+def analyseStationsData(stationsWithLevelAndFlow):
+
+    stationsWithLevelAndFlow = (stationsWithLevelAndFlow.convert_dtypes()
+                            .fillna({'waterLevel':False,'waterFlow':False}))
+
+    # Count stations with only one of desired measures
+    nLevelOnly = len(stationsWithLevelAndFlow.query("waterLevel and not(waterFlow)"))
+    nFlowOnly = len(stationsWithLevelAndFlow.query("not(waterLevel) and waterFlow"))
+    print("{0} stations have no Flow measure, {1} stations have no Level measure".format(nLevelOnly, nFlowOnly))
+
+    # Check data aligns for stations with both measures
+    stationsWithBoth = (stationsWithLevelAndFlow.query("waterLevel and waterFlow")
+                                    .assign(namesMisaligned = lambda df: df.name_x != df.name_y,
+                                            riversMisaligned = lambda df: df.river_x != df.river_y,
+                                            latMisaligned = lambda df: df.lat_x != df.lat_y,
+                                            longMisaligned = lambda df: df.long_x != df.long_y))
+    anyMisaligned = stationsWithBoth.query("namesMisaligned or riversMisaligned or latMisaligned or longMisaligned")
+    print("""{0} stations have conflicts: {1} stations have name conflicts,
+            {2} stations have river conflicts, {3} stations have lat conflicts,
+            {4} stations have long conflicts""".format(len(anyMisaligned),
+                sum(stationsWithBoth.namesMisaligned), sum(stationsWithBoth.riversMisaligned),
+                sum(stationsWithBoth.latMisaligned), sum(stationsWithBoth.longMisaligned)))
+    
+    return anyMisaligned
+
+def cleanLevelAndFlowData(joinedLevelAndFlowData):
+        
+    joinedLevelAndFlowData['name'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.name_x, joinedLevelAndFlowData.name_y)
+    joinedLevelAndFlowData['river'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.river_x, joinedLevelAndFlowData.river_y)
+    joinedLevelAndFlowData['lat'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.lat_x, joinedLevelAndFlowData.lat_y)
+    joinedLevelAndFlowData['long'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.long_x, joinedLevelAndFlowData.long_y)
+    
+    return joinedLevelAndFlowData[["ref", "name", "river", "waterLevel", "waterFlow", "lat", "long"]]
+
+def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCoords):
+
+    # Split into 4 categories and plot
+    missalignedStations = stationsWithMismatchedCoords[["ref"]].assign(misaligned = True)
+    missalignedStations["ref"] = missalignedStations["ref"].astype(str)
+    cleanedLevelAndFlowData["ref"] = cleanedLevelAndFlowData["ref"].astype(str)
+    cleanedLevelAndFlowData = (pd.merge(cleanedLevelAndFlowData, missalignedStations, how="left", on="ref")
+                        .convert_dtypes()
+                        .fillna({"misaligned": False}))
+    cleanedLevelAndFlowData["cat"] = np.where(cleanedLevelAndFlowData.waterLevel, "Level only", "Flow only")
+    cleanedLevelAndFlowData["cat"] = np.where(cleanedLevelAndFlowData.apply(lambda df: df.waterLevel and df.waterFlow, axis=1), "Both", cleanedLevelAndFlowData.cat)
+    cleanedLevelAndFlowData["cat"] = np.where(cleanedLevelAndFlowData.misaligned, "Both (non-matching)", cleanedLevelAndFlowData.cat)
+
+
 stationsURL = "/id/stations.json"
-stationsParams = {"_limit": 10}
 
-##response = requests.get(baseURL+stationsURL, params=stationsParams)
-##if response.status_code == 200:
-##    
-##    stations = response.json()["items"]
-##
-##    allStationInfo = []
-##
-##    for station in stations:
-##        
-##        stationInfo = {
-##            "name": station["label"],
-##            "river": station["riverName"],
-##            "ref": station["RLOIid"],
-##            "types": [typeDat["@id"] for typeDat in station["type"]]
-##            }
-##        allStationInfo.append(stationInfo)
-##
-##    allStationData = (pd.DataFrame(allStationInfo)
-##                          .explode("types"))
-##
-##    print(allStationData.groupby("types").size())
-##    #print(json.dumps(station, indent=2))
-##
-##else:
-##
-##    raise Exception("API error {0}".format(response.status_code))
+if __name__ == "main":
 
-query1 = {"status.label":"Active", "observedProperty": "waterLevel", "_limit": 5000}
+    levelStations = queryStationData("waterLevel")
+    flowStations = queryStationData("waterFlow")
 
-response = requests.get(baseURL+stationsURL, params=query1)
-if response.status_code == 200:
-    levelStations = getStationsInfo(response)
-else:
-    raise Exception("API error {0}".format(response.status_code))
-
-query2 = {"status.label":"Active", "observedProperty": "waterFlow", "_limit": 5000}
-
-response = requests.get(baseURL+stationsURL, params=query2)
-if response.status_code == 200:
-    flowStations = getStationsInfo(response)
-else:
-    raise Exception("API error {0}".format(response.status_code))
-
-levelStations["ref"] = levelStations["ref"].astype(str)
-flowStations["ref"] = flowStations["ref"].astype(str)
-allStations = (pd.merge(levelStations.assign(waterLevel = True),
+    levelStations["ref"] = levelStations["ref"].astype(str)
+    flowStations["ref"] = flowStations["ref"].astype(str)
+    allStations = (pd.merge(levelStations.assign(waterLevel = True),
                         flowStations.assign(waterFlow = True),#[["ref","waterFlow"]],
                         how="outer", on="ref"))
 
-nUniqueStations = len(allStations)
-allStations = (allStations.convert_dtypes()
-                          .fillna({'waterLevel':False,'waterFlow':False}))
+    anyMisaligned = analyseStationsData(allStations)
+    stationsTidy = cleanLevelAndFlowData(allStations)
 
-# Count stations with only one of desired measures
-nLevelOnly = len(allStations.query("waterLevel and not(waterFlow)"))
-nFlowOnly = len(allStations.query("not(waterLevel) and waterFlow"))
-print("{0} stations have no Flow measure, {1} stations have no Level measure".format(nLevelOnly, nFlowOnly))
+    stationsTidy = categoriseLevelAndFlowData(stationsTidy, anyMisaligned)
 
-# Check data aligns for stations with both measures
-stationsWithBoth = (allStations.query("waterLevel and waterFlow")
-                                .assign(namesMisaligned = lambda df: df.name_x != df.name_y,
-                                        riversMisaligned = lambda df: df.river_x != df.river_y,
-                                        latMisaligned = lambda df: df.lat_x != df.lat_y,
-                                        longMisaligned = lambda df: df.long_x != df.long_y))
-anyMisaligned = stationsWithBoth.query("namesMisaligned or riversMisaligned or latMisaligned or longMisaligned")
-print("""{0} stations have conflicts: {1} stations have name conflicts,
-        {2} stations have river conflicts, {3} stations have lat conflicts,
-        {4} stations have long conflicts""".format(len(anyMisaligned),
-            sum(stationsWithBoth.namesMisaligned), sum(stationsWithBoth.riversMisaligned),
-            sum(stationsWithBoth.latMisaligned), sum(stationsWithBoth.longMisaligned)))
+    # Geostuff
+    stationsGeo = gpd.GeoDataFrame(
+        stationsTidy,
+        geometry = gpd.points_from_xy(stationsTidy.long, stationsTidy.lat),
+        crs = "EPSG:4326"
+    )
+    stationsGeo.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
 
-# Tidy
-allStations['name'] = np.where(allStations.waterLevel, allStations.name_x, allStations.name_y)
-allStations['river'] = np.where(allStations.waterLevel, allStations.river_x, allStations.river_y)
-allStations['lat'] = np.where(allStations.waterLevel, allStations.lat_x, allStations.lat_y)
-allStations['long'] = np.where(allStations.waterLevel, allStations.long_x, allStations.long_y)
-stationsTidy = allStations[["ref", "name", "river", "waterLevel", "waterFlow", "lat", "long"]]
-
-# Split into 4 categories and plot
-missalignedStations = anyMisaligned[["ref"]].assign(misaligned = True)
-missalignedStations["ref"] = missalignedStations["ref"].astype(str)
-stationsTidy["ref"] = stationsTidy["ref"].astype(str)
-stationsTidy = (pd.merge(stationsTidy, missalignedStations, how="left", on="ref")
-                    .convert_dtypes()
-                    .fillna({"misaligned": False}))
-stationsTidy["cat"] = np.where(stationsTidy.waterLevel, "Level only", "Flow only")
-stationsTidy["cat"] = np.where(stationsTidy.apply(lambda df: df.waterLevel and df.waterFlow, axis=1), "Both", stationsTidy.cat)
-stationsTidy["cat"] = np.where(stationsTidy.misaligned, "Both (non-matching)", stationsTidy.cat)
-
-# Geostuff
-stationsGeo = gpd.GeoDataFrame(
-    stationsTidy,
-    geometry = gpd.points_from_xy(stationsTidy.long, stationsTidy.lat),
-    crs = "EPSG:4326"
-)
-stationsGeo.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
-
-latLong = [53.2395049,-0.586698]
+    latLong = [53.2395049,-0.586698]
