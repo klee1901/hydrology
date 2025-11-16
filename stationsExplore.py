@@ -6,6 +6,7 @@ import requests
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from shapely.geometry import Point
 
 baseURL = "http://environment.data.gov.uk/hydrology"
 
@@ -86,13 +87,9 @@ def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCo
 
     return cleanedLevelAndFlowData
 
-def getNearestStations(stationLocations, coords, n=5):
+def getNearestStations(stationLocations, target, n=5):
 
-    stationLocations["distFromTarget"] = (
-        (stationLocations["lat"] - coords[0])**2 +
-        (stationLocations["long"] - coords[1])**2
-        )**0.5
-
+    stationLocations["distFromTarget"] = stationLocations["geometry"].distance(target)
 
     return stationLocations.nsmallest(n, "distFromTarget")
 
@@ -126,5 +123,5 @@ if __name__ == "__main__":
     )
     stationsGeo.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
 
-    localStations = getNearestStations(stationsGeo, [53.2395049,-0.586698])
+    localStations = getNearestStations(stationsGeo, Point(-0.586698,53.239504))
     localStations.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
