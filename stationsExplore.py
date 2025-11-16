@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
+from levelAnalysis import getReadingsData, cleanMeasuresData
 
 baseURL = "http://environment.data.gov.uk/hydrology"
 
@@ -125,3 +126,11 @@ if __name__ == "__main__":
 
     localStations = getNearestStations(stationsGeo, Point(-0.586698,53.239504))
     localStations.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
+
+    localLevelStationIDs = localStations.reset_index().query("waterLevel").index
+
+    for stationID in localLevelStationIDs:
+
+        levelMeasures = getReadingsData(localStations.iloc[stationID, 0])
+        measuresUnique = cleanMeasuresData(levelMeasures)
+        measuresUnique.plot(x="date", y="value")
