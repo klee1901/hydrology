@@ -42,9 +42,6 @@ def queryStationData(param):
 
 def analyseStationsData(stationsWithLevelAndFlow):
 
-    stationsWithLevelAndFlow = (stationsWithLevelAndFlow.convert_dtypes()
-                            .fillna({'waterLevel':False,'waterFlow':False}))
-
     # Count stations with only one of desired measures
     nLevelOnly = len(stationsWithLevelAndFlow.query("waterLevel and not(waterFlow)"))
     nFlowOnly = len(stationsWithLevelAndFlow.query("not(waterLevel) and waterFlow"))
@@ -87,10 +84,12 @@ def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCo
     cleanedLevelAndFlowData["cat"] = np.where(cleanedLevelAndFlowData.apply(lambda df: df.waterLevel and df.waterFlow, axis=1), "Both", cleanedLevelAndFlowData.cat)
     cleanedLevelAndFlowData["cat"] = np.where(cleanedLevelAndFlowData.misaligned, "Both (non-matching)", cleanedLevelAndFlowData.cat)
 
+    return cleanedLevelAndFlowData
+
 
 stationsURL = "/id/stations.json"
 
-if __name__ == "main":
+if __name__ == "__main__":
 
     levelStations = queryStationData("waterLevel")
     flowStations = queryStationData("waterFlow")
@@ -100,6 +99,9 @@ if __name__ == "main":
     allStations = (pd.merge(levelStations.assign(waterLevel = True),
                         flowStations.assign(waterFlow = True),#[["ref","waterFlow"]],
                         how="outer", on="ref"))
+
+    allStations = (allStations.convert_dtypes()
+                            .fillna({'waterLevel':False,'waterFlow':False}))
 
     anyMisaligned = analyseStationsData(allStations)
     stationsTidy = cleanLevelAndFlowData(allStations)
