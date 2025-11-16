@@ -86,6 +86,16 @@ def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCo
 
     return cleanedLevelAndFlowData
 
+def getNearestStations(stationLocations, coords, n=5):
+
+    stationLocations["distFromTarget"] = (
+        (stationLocations["lat"] - coords[0])**2 +
+        (stationLocations["long"] - coords[1])**2
+        )**0.5
+
+
+    return stationLocations.nsmallest(n, "distFromTarget")
+
 
 stationsURL = "/id/stations.json"
 
@@ -116,4 +126,5 @@ if __name__ == "__main__":
     )
     stationsGeo.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
 
-    latLong = [53.2395049,-0.586698]
+    localStations = getNearestStations(stationsGeo, [53.2395049,-0.586698])
+    localStations.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
