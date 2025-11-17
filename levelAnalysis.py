@@ -6,12 +6,25 @@ import datetime
 import warnings
 
 baseURL = "http://environment.data.gov.uk/hydrology"
+readingExt = "/data/readings.json"
+measuresExt = "/id/measures.json"
+
+def getAvailableMeasures(stationID):
+
+    queryParams = {"station": stationID}
+    response = requests.get(baseURL+measuresExt, params=queryParams)
+    if response.status_code == 200:
+        measuresInfo = pd.json_normalize(response.json()["items"])
+    else:
+        raise Exception("API error {0}".format(response.status_code))
+
+    return measuresInfo
 
 def getReadingsData(stationID):
         
     readingParams = {"station": stationID, "observedProperty": "waterLevel",
         "mineq-date": "2023-01-01", "period": 86400, "valueType": "max"}
-    response = requests.get(baseURL+readingURL, params=readingParams)
+    response = requests.get(baseURL+readingExt, params=readingParams)
     if response.status_code == 200:
         measuresData = pd.json_normalize(response.json()["items"])
     else:
@@ -44,11 +57,11 @@ def getDataNearTargetDate(stationID, targetDate):
     # stationID = nettlehamID
     # targetDate = dateOfInterest
 
-    targetDate = datetime.datetime.strptime(targetDate, "%Y-%m-%d")
+    targetDatetime = datetime.datetime.strptime(targetDate, "%Y-%m-%d")
 
-    startDate = targetDate - datetime.timedelta(days=5)
+    startDate = targetDatetime - datetime.timedelta(days=5)
     startDate = datetime.datetime.strftime(startDate, "%Y-%m-%d")
-    endDate = targetDate + datetime.timedelta(days=5)
+    endDate = targetDatetime + datetime.timedelta(days=5)
     endDate = datetime.datetime.strftime(endDate, "%Y-%m-%d")
 
     readingURL = "/data/readings.json"
@@ -79,8 +92,6 @@ def getDataNearMaximums(maximumObs, stationID):
 
     return dataAroundPeaks
 
-
-readingURL = "/data/readings.json"
 
 if __name__ == "__main__":
 
