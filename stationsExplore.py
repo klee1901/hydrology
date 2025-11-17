@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-from levelAnalysis import getReadingsData, cleanMeasuresData
+from levelAnalysis import getReadingsData, cleanMeasuresData, getLocalMaximums, getDataNearMaximums, getDataNearTargetDate
+import datetime # For levelAnalysis functions
+import warnings
 
 baseURL = "http://environment.data.gov.uk/hydrology"
 
@@ -129,8 +131,19 @@ if __name__ == "__main__":
 
     localLevelStationIDs = localStations.reset_index().query("waterLevel").index
 
+    # Enable warnings to be raised when querying 15-min data
+    warnings.simplefilter("always")
+
     for stationID in localLevelStationIDs:
 
         levelMeasures = getReadingsData(localStations.iloc[stationID, 0])
         measuresUnique = cleanMeasuresData(levelMeasures)
-        measuresUnique.plot(x="date", y="value")
+        measuresUnique.plot(
+            x="date", y="value", title=localStations.iloc[stationID, 1]
+        )
+
+        peaks = getLocalMaximums(measuresUnique)
+        dataNearPeaks = getDataNearMaximums(peaks, localStations.iloc[stationID, 0])
+
+        valuesAroundPeaks = dataNearPeaks.pivot(columns = 'peakDate', values = 'value')
+        valuesAroundPeaks.plot()

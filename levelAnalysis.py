@@ -3,6 +3,7 @@ import requests
 #import numpy as np
 import pandas as pd
 import datetime
+import warnings
 
 baseURL = "http://environment.data.gov.uk/hydrology"
 
@@ -59,7 +60,10 @@ def getDataNearTargetDate(stationID, targetDate):
     else:
         raise Exception("API error {0}".format(response.status_code))
 
-    levelMeasures = levelMeasures.sort_values('dateTime')
+    if levelMeasures.shape[0] > 0:
+        levelMeasures = levelMeasures.sort_values('dateTime')
+    else:
+        warnings.warn("No detailed data available around "+targetDate, Warning)
 
     return levelMeasures
 
@@ -85,6 +89,8 @@ if __name__ == "__main__":
     measuresUnique = cleanMeasuresData(levelMeasures)
 
     measuresUnique.plot(x="date", y="value")
+
+    warnings.simplefilter("always")
 
     peaks = getLocalMaximums(measuresUnique)
     dataNearPeaks = getDataNearMaximums(peaks, nettlehamID)
