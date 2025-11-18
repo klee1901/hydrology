@@ -36,9 +36,9 @@ def tabulateAvailableMeasuresStations(availableMeasuresStationsData):
 
     return availableMeasuresStationsData
 
-def getReadingsData(stationID, property="waterLevel", period="daily", valueType=pd.NA):
+def getReadingsData(stationID, prop="waterLevel", period="daily", valueType=pd.NA):
     
-    readingParams = {"station": stationID, "observedProperty": property}
+    readingParams = {"station": stationID, "observedProperty": prop}
     currentDatetime = datetime.datetime.now()
 
     if period == "daily":
@@ -58,6 +58,11 @@ def getReadingsData(stationID, property="waterLevel", period="daily", valueType=
         measuresData = pd.json_normalize(response.json()["items"])
     else:
         raise Exception("API error {0}".format(response.status_code))
+
+    measuresData["station"] = stationID
+    measuresData["observedProperty"] = prop
+    measuresData["period"] = period
+    measuresData["valueType"] = valueType
 
     return measuresData
 

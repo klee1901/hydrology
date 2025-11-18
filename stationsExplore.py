@@ -134,6 +134,13 @@ if __name__ == "__main__":
     availableMeasuresLocally = getAvailableMeasuresAcrossStations(localStations.ref)
     availableMeasuresTable = tabulateAvailableMeasuresStations(availableMeasuresLocally)
 
+    availableMeasuresLocally["parameterName"] = "water" + availableMeasuresLocally["parameterName"]
+    availableMeasuresLocally = pd.merge(availableMeasuresLocally, localStations[["ref","name"]],
+                                        left_on = "station.label", right_on="name")
+
+    latestDataDFs = availableMeasuresLocally.apply(lambda x: getReadingsData(x.ref, x.parameterName, x.periodName, x.valueType), axis=1)
+    latestData = pd.concat(list(latestDataDFs))
+
     localLevelStationIDs = localStations.query("waterLevel").ref
 
     # Enable warnings to be raised when querying 15-min data
