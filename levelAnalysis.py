@@ -31,10 +31,23 @@ def getAvailableMeasuresAcrossStations(stationIDs):
 
     return availableMeasures
 
-def getReadingsData(stationID):
-        
-    readingParams = {"station": stationID, "observedProperty": "waterLevel",
-        "mineq-date": "2023-01-01", "period": 86400, "valueType": "max"}
+def getReadingsData(stationID, property="waterLevel", period="daily", valueType=pd.NA):
+    
+    readingParams = {"station": stationID, "observedProperty": property}
+    currentDatetime = datetime.datetime.now()
+
+    if period == "daily":
+        startDate = currentDatetime - datetime.timedelta(days=1000)
+        readingParams["period"] = 86400
+    else:
+        startDate = currentDatetime - datetime.timedelta(hours=250)
+        readingParams["period"] = 900
+
+    readingParams["mineq-date"] = datetime.datetime.strftime(startDate, "%Y-%m-%d")
+
+    if not(pd.isna(valueType)):
+        readingParams["valueType"] = valueType
+
     response = requests.get(baseURL+readingExt, params=readingParams)
     if response.status_code == 200:
         measuresData = pd.json_normalize(response.json()["items"])
