@@ -20,6 +20,17 @@ def getAvailableMeasures(stationID):
 
     return measuresInfo
 
+def getAvailableMeasuresAcrossStations(stationIDs):
+
+    availableMeasuresDFs = [getAvailableMeasures(stationID) for stationID in stationIDs]
+    availableMeasures = pd.concat(availableMeasuresDFs)
+    availableMeasures["measure"] = availableMeasures["periodName"] + " " + availableMeasures["valueType"] + " " + availableMeasures["parameterName"]
+    availableMeasures = availableMeasures[["station.label", "measure"]]
+    availableMeasures.loc[:,"present"] = True
+    availableMeasures = availableMeasures.pivot(index="station.label", columns="measure", values="present")
+
+    return availableMeasures
+
 def getReadingsData(stationID):
         
     readingParams = {"station": stationID, "observedProperty": "waterLevel",

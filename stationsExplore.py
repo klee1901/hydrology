@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-from levelAnalysis import getReadingsData, cleanMeasuresData, getAvailableMeasures, getLocalMaximums, getDataNearMaximums, getDataNearTargetDate
+from levelAnalysis import (getReadingsData, cleanMeasuresData, getAvailableMeasures,
+                            getAvailableMeasuresAcrossStations, getLocalMaximums,
+                             getDataNearMaximums, getDataNearTargetDate)
 import datetime # For levelAnalysis functions
 import warnings
 
@@ -129,10 +131,7 @@ if __name__ == "__main__":
     localStations = getNearestStations(stationsGeo, Point(-0.586698,53.239504))
     localStations.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
 
-    availableMeasuresLocallyDFs = [getAvailableMeasures(stationID) for stationID in localStations.ref]
-    availableMeasuresLocally = pd.concat(availableMeasuresLocallyDFs)
-    availableMeasuresLocally = availableMeasuresLocally[["station.label", "periodName", "parameterName"]]
-    availableMeasuresLocally["measure"] = availableMeasuresLocally["periodName"] + " " + availableMeasuresLocally["parameterName"]
+    availableMeasuresLocally = getAvailableMeasuresAcrossStations(localStations.ref)
 
     localLevelStationIDs = localStations.query("waterLevel").ref
 
