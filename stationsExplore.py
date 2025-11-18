@@ -8,8 +8,8 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 from levelAnalysis import (getReadingsData, cleanMeasuresData, getAvailableMeasures,
-                            getAvailableMeasuresAcrossStations, getLocalMaximums,
-                             getDataNearMaximums, getDataNearTargetDate)
+                            getAvailableMeasuresAcrossStations, tabulateAvailableMeasuresStations,
+                            getLocalMaximums, getDataNearMaximums, getDataNearTargetDate)
 import datetime # For levelAnalysis functions
 import warnings
 
@@ -132,6 +132,7 @@ if __name__ == "__main__":
     localStations.explore(column="cat", tooltip = "name", popup = True, tiles = "CartoDB positron")
 
     availableMeasuresLocally = getAvailableMeasuresAcrossStations(localStations.ref)
+    availableMeasuresTable = tabulateAvailableMeasuresStations(availableMeasuresLocally)
 
     localLevelStationIDs = localStations.query("waterLevel").ref
 
