@@ -16,6 +16,24 @@ import warnings
 baseURL = "http://environment.data.gov.uk/hydrology"
 
 def getStationsInfo(JSONresponse):
+    """
+    Create DataFrame of station metadata given an API response from a query of
+     the stations API
+
+    Parameter
+    ---------
+    JSONresponse : List
+        Result of successful API call to the list of monitoring stations API
+
+    Returns
+    -------
+    DataFrame
+        Extracted information from json data with 1 row per station
+
+    See Also
+    --------
+    queryStationData : Calls stations API for given property 
+    """
 
     stations = JSONresponse.json()["items"]
 
@@ -35,6 +53,24 @@ def getStationsInfo(JSONresponse):
     return pd.DataFrame(allStationInfo)
 
 def queryStationData(param):
+    """
+    Extract metadata on stations that measure a particular property
+
+    Parameter
+    ---------
+    param : string
+        observedProperty to pass to API call
+
+    Raises
+    ------
+    Error
+        If API call is unsuccessful
+
+    Returns
+    -------
+    stationsData : DataFrame
+        station metadata extracted by getStationsInfo
+    """
 
     query1 = {"status.label":"Active", "observedProperty": param, "_limit": 5000}
 
@@ -47,6 +83,28 @@ def queryStationData(param):
     return stationsData
 
 def analyseStationsData(stationsWithLevelAndFlow):
+    """
+    Display summary stats of stations that have either waterLevel, waterFlow (or
+     both) measures
+
+    Parameter
+    ---------
+    stationsWithLevelAndFlow : DataFrame
+        Merged outputs from queryStationData (for 'waterLevel' and 'waterFlow')
+         with boolean columns to note present of measurement data for these
+         properties
+
+    Returns
+    -------
+    anyMisaligned : DataFrame
+        Subset of stationsWithLevelAndFlow where different metadata has been
+         reported when querying flow stations than level stations
+
+    See Also
+    --------
+    categoriseLevelAndFlowData :  Assigns column (on to cleaned data) that
+     captures similar information to this
+    """
 
     # Count stations with only one of desired measures
     nLevelOnly = len(stationsWithLevelAndFlow.query("waterLevel and not(waterFlow)"))
@@ -69,6 +127,21 @@ def analyseStationsData(stationsWithLevelAndFlow):
     return anyMisaligned
 
 def cleanLevelAndFlowData(joinedLevelAndFlowData):
+    """
+    Simplify merged data from calling queryStationData for level and flow measures
+
+    Parameter
+    ---------
+    joinedLevelAndFlowData : DataFrame
+        Merged outputs from queryStationData (for 'waterLevel' and 'waterFlow')
+         with boolean columns indicating whether station has measure timeseries
+         for waterLevel and/or waterFlow
+
+    Returns
+    -------
+    DataFrame
+        stations data with single name, river, lat , long variables
+    """
         
     joinedLevelAndFlowData['name'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.name_x, joinedLevelAndFlowData.name_y)
     joinedLevelAndFlowData['river'] = np.where(joinedLevelAndFlowData.waterLevel, joinedLevelAndFlowData.river_x, joinedLevelAndFlowData.river_y)
@@ -78,6 +151,23 @@ def cleanLevelAndFlowData(joinedLevelAndFlowData):
     return joinedLevelAndFlowData[["ref", "name", "river", "waterLevel", "waterFlow", "lat", "long"]]
 
 def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCoords):
+    """
+    Assign categories to output from cleanLevelAndFlowData depending on whether
+     it has a measurement timeseries for 'waterLevel', 'waterFlow', neither, or
+     both
+
+    Parameters
+    ----------
+    cleanedLevelAndFlowData : DataFrame
+        List of stations output from cleanLevelAndFlowData
+    stationsWithMismatchedCoords : DataFrame
+        List of stations output from anyMisaligned
+
+    Returns
+    -------
+    cleanedLevelAndFlowData : DataFrame
+        List of stations with additional 'cat' column
+    """
 
     # Split into 4 categories and plot
     missalignedStations = stationsWithMismatchedCoords[["ref"]].assign(misaligned = True)
@@ -93,6 +183,24 @@ def categoriseLevelAndFlowData(cleanedLevelAndFlowData, stationsWithMismatchedCo
     return cleanedLevelAndFlowData
 
 def getNearestStations(stationLocations, target, n=5):
+    """
+    Return list of n nearest stations to a pair of coordinates (target)
+
+    Parameters
+    ----------
+    stationLocations : GeoDataFrame
+        List of all stations to consider
+    target : Point
+        Location (in same crs as stationLocations) to search near
+    n : integer
+        Number of stations to return. 5 (default) returns 5 nearest stations to
+         target
+
+    Returns
+    -------
+    DataFrame
+        Subset of stationLocations containing n nearest to target
+    """
 
     stationLocations["distFromTarget"] = stationLocations["geometry"].distance(target)
 
